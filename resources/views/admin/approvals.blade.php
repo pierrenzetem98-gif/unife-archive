@@ -4,7 +4,7 @@
         <!-- En-tête Admin -->
         <div class="relative overflow-hidden rounded-3xl bg-slate-950 border-2 border-amber-500/50 shadow-2xl p-8 text-white mb-8">
             <div class="absolute -right-10 -bottom-10 w-64 h-64 rounded-full bg-amber-500/10 blur-3xl pointer-events-none"></div>
-            
+
             <div class="relative z-10">
                 <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-black tracking-widest uppercase bg-amber-500 text-slate-950 mb-3">
                     SuperAdmin &bull; Pierre Nzetem
@@ -24,30 +24,63 @@
             </div>
         @endif
 
+        @if($errors->any())
+            <div class="mb-6 p-4 bg-red-950/80 border border-red-500/50 text-red-300 rounded-2xl text-sm font-bold shadow-lg">
+                ⚠️ {{ $errors->first() }}
+            </div>
+        @endif
+
+        <!-- Code d'activation généré (affiché UNE seule fois) -->
+        @if(session('activation_code'))
+            @php
+                $ac = session('activation_code');
+                $igMessage = "Ciao {$ac['name']}! Il tuo codice di attivazione per l'Archivio Esami UniFe è: {$ac['code']} (valido {$ac['hours']} ore). Accedi al sito e inseriscilo nella pagina di attesa.";
+            @endphp
+            <div class="mb-8 p-6 bg-slate-950 border-2 border-amber-500 rounded-3xl shadow-2xl" x-data="{ copied: false }">
+                <p class="text-xs uppercase tracking-widest text-amber-400 font-black mb-1">Codice generato per</p>
+                <p class="text-white font-bold">{{ $ac['name'] }} <span class="text-slate-400 font-normal">&middot; {{ $ac['email'] }}</span></p>
+
+                <p class="my-4 text-5xl font-mono font-black tracking-[0.25em] text-amber-400 select-all">{{ $ac['code'] }}</p>
+
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 text-xs text-slate-300 mb-4 select-all">{{ $igMessage }}</div>
+
+                <button type="button"
+                        @click="navigator.clipboard.writeText(@js($igMessage)).then(() => { copied = true; setTimeout(() => copied = false, 2500) })"
+                        class="bg-gradient-to-r from-purple-600 via-pink-600 to-amber-500 text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow hover:scale-105 transition">
+                    <span x-show="!copied">Copia messaggio per Instagram</span>
+                    <span x-show="copied" x-cloak>✓ Copiato!</span>
+                </button>
+
+                <p class="mt-4 text-[11px] text-slate-500">
+                    ⚠️ Questo codice non sarà più visibile dopo aver lasciato la pagina. Se lo perdi, generane uno nuovo (il precedente verrà annullato).
+                </p>
+            </div>
+        @endif
+
         <!-- SÉLECTEUR D'ONGLETS -->
         <div class="flex border-b border-slate-300 dark:border-slate-800 mb-8 gap-4">
-            <button @click="tab = 'utenti'" 
+            <button @click="tab = 'utenti'"
                     :class="tab === 'utenti' ? 'border-b-2 border-amber-500 text-amber-500 font-black' : 'text-slate-500 hover:text-slate-300'"
                     class="py-3 px-4 text-sm transition focus:outline-none flex items-center gap-2 uppercase tracking-wider">
                 <span>1. Gestione Utenti</span>
-                <span class="text-xs bg-red-600 text-white font-bold px-2 py-0.5 rounded-full shadow" x-show="{{ $pendingUsers->count() }} > 0">
-                    {{ $pendingUsers->count() }}
-                </span>
+                @if($pendingUsers->count() > 0)
+                    <span class="text-xs bg-red-600 text-white font-bold px-2 py-0.5 rounded-full shadow">{{ $pendingUsers->count() }}</span>
+                @endif
             </button>
 
-            <button @click="tab = 'esami'" 
+            <button @click="tab = 'esami'"
                     :class="tab === 'esami' ? 'border-b-2 border-amber-500 text-amber-500 font-black' : 'text-slate-500 hover:text-slate-300'"
                     class="py-3 px-4 text-sm transition focus:outline-none flex items-center gap-2 uppercase tracking-wider">
                 <span>2. Nuovi Esami Community</span>
-                <span class="text-xs bg-amber-500 text-slate-950 font-bold px-2 py-0.5 rounded-full shadow" x-show="{{ $communityExams->count() }} > 0">
-                    {{ $communityExams->count() }}
-                </span>
+                @if($communityExams->count() > 0)
+                    <span class="text-xs bg-amber-500 text-slate-950 font-bold px-2 py-0.5 rounded-full shadow">{{ $communityExams->count() }}</span>
+                @endif
             </button>
         </div>
 
         <!-- ================= ONGLET 1: GESTION UTILISATEURS ================= -->
         <div x-show="tab === 'utenti'" x-transition class="space-y-8">
-            
+
             <!-- Utilisateurs en attente -->
             <div class="bg-slate-900 rounded-3xl border border-amber-500/30 shadow-xl overflow-hidden">
                 <div class="p-5 border-b border-slate-800 bg-slate-950/50">
@@ -62,23 +95,51 @@
                             <tr>
                                 <th class="pb-3 px-4">Nome</th>
                                 <th class="pb-3 px-4">Email</th>
+                                <th class="pb-3 px-4">Codice</th>
                                 <th class="pb-3 px-4 text-right">Azioni</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-800">
                             @forelse($pendingUsers as $user)
+                                @php $status = $user->activationStatus(); @endphp
                                 <tr>
                                     <td class="py-4 px-4 font-bold text-white">{{ $user->name }}</td>
                                     <td class="py-4 px-4 text-slate-400">{{ $user->email }}</td>
+                                    <td class="py-4 px-4 text-xs whitespace-nowrap">
+                                        @switch($status)
+                                            @case('active')
+                                                <span class="text-emerald-400 font-bold">Attivo</span>
+                                                <span class="text-slate-500">&middot; scade {{ $user->activation_code_expires_at->timezone('Europe/Rome')->format('d/m H:i') }}</span>
+                                                @if($user->activation_attempts > 0)
+                                                    <span class="text-amber-400">&middot; {{ $user->activation_attempts }} errori</span>
+                                                @endif
+                                                @break
+                                            @case('expired')
+                                                <span class="text-red-400 font-bold">Scaduto</span>
+                                                @break
+                                            @case('locked')
+                                                <span class="text-red-400 font-bold">Bloccato</span>
+                                                @break
+                                            @default
+                                                <span class="text-slate-500">Nessuno</span>
+                                        @endswitch
+                                    </td>
                                     <td class="py-4 px-4 text-right">
-                                        <div class="inline-flex gap-2">
+                                        <div class="inline-flex flex-wrap justify-end gap-2">
+                                            <form method="POST" action="{{ route('admin.approvals.generate-code', $user->id) }}">
+                                                @csrf
+                                                <button class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs px-4 py-2 rounded-xl transition">
+                                                    {{ $status === 'none' ? 'Genera codice' : 'Nuovo codice' }}
+                                                </button>
+                                            </form>
                                             <form method="POST" action="{{ route('admin.approvals.approve', $user->id) }}">
                                                 @csrf
                                                 <button class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-4 py-2 rounded-xl transition">
                                                     Approva
                                                 </button>
                                             </form>
-                                            <form method="POST" action="{{ route('admin.approvals.destroy', $user->id) }}">
+                                            <form method="POST" action="{{ route('admin.approvals.destroy', $user->id) }}"
+                                                  onsubmit="return confirm('Rifiutare ed eliminare {{ addslashes($user->name) }}?')">
                                                 @csrf @method('DELETE')
                                                 <button class="bg-slate-800 hover:bg-red-600 text-slate-300 hover:text-white font-bold text-xs px-4 py-2 rounded-xl transition">
                                                     Rifiuta
@@ -89,7 +150,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="3" class="py-8 text-center text-slate-500">Nessun utente in attesa.</td>
+                                    <td colspan="4" class="py-8 text-center text-slate-500">Nessun utente in attesa.</td>
                                 </tr>
                             @endforelse
                         </tbody>
@@ -108,7 +169,8 @@
                                     <td class="py-3 px-2 text-slate-200 font-bold">{{ $user->name }}</td>
                                     <td class="py-3 px-2">{{ $user->email }}</td>
                                     <td class="py-3 px-2 text-right">
-                                        <form method="POST" action="{{ route('admin.approvals.destroy', $user->id) }}">
+                                        <form method="POST" action="{{ route('admin.approvals.destroy', $user->id) }}"
+                                              onsubmit="return confirm('Revocare l\'accesso a {{ addslashes($user->name) }}? L\'account verrà eliminato.')">
                                             @csrf @method('DELETE')
                                             <button class="text-red-500 hover:text-red-400 font-bold">Revoca Accesso</button>
                                         </form>
@@ -123,7 +185,7 @@
 
         <!-- ================= ONGLET 2: GESTION EXAMENS ================= -->
         <div x-show="tab === 'esami'" x-cloak x-transition class="space-y-6">
-            
+
             <div class="bg-slate-900 rounded-3xl border border-slate-800 shadow-xl overflow-hidden p-6">
                 <h2 class="text-lg font-black text-white mb-6 uppercase tracking-wider">
                     File inviati dalla Community ({{ $communityExams->count() }})
@@ -132,8 +194,7 @@
                 <div class="grid grid-cols-1 gap-4">
                     @forelse($communityExams as $exam)
                         <div class="flex flex-col md:flex-row justify-between items-start md:items-center bg-slate-950 border border-slate-800 p-5 rounded-2xl gap-4">
-                            
-                            <!-- Infos Examen -->
+
                             <div>
                                 <div class="flex items-center gap-2 mb-1">
                                     <span class="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-blue-900/50 text-amber-400 border border-amber-500/20">
@@ -143,18 +204,16 @@
                                 </div>
                                 <h3 class="text-base font-bold text-white">{{ $exam->title }}</h3>
                                 <p class="text-xs text-slate-400 mt-1">
-                                    Caricato da: <strong class="text-amber-400">{{ $exam->uploader->name ?? 'Sconosciuto' }}</strong> 
+                                    Caricato da: <strong class="text-amber-400">{{ $exam->uploader->name ?? 'Sconosciuto' }}</strong>
                                     &bull; A.A. {{ $exam->academic_year }} &bull; {{ $exam->type }}
                                 </p>
                             </div>
 
-                            <!-- Actions Examen -->
                             <div class="flex flex-wrap gap-2 w-full md:w-auto">
                                 <a href="{{ route('exams.download', $exam->id) }}" class="bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition text-center flex-1 md:flex-none">
                                     Scarica PDF
                                 </a>
-                                
-                                <!-- Bouton Valider (Passe dans l'archive officielle) -->
+
                                 <form method="POST" action="{{ route('admin.exams.make-official', $exam->id) }}" class="flex-1 md:flex-none">
                                     @csrf @method('PATCH')
                                     <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2 rounded-xl transition text-center shadow-lg shadow-emerald-600/20">
@@ -162,8 +221,8 @@
                                     </button>
                                 </form>
 
-                                <!-- Bouton Supprimer -->
-                                <form method="POST" action="{{ route('exams.destroy', $exam->id) }}" class="flex-1 md:flex-none">
+                                <form method="POST" action="{{ route('exams.destroy', $exam->id) }}" class="flex-1 md:flex-none"
+                                      onsubmit="return confirm('Eliminare definitivamente questo documento?')">
                                     @csrf @method('DELETE')
                                     <button type="submit" class="w-full bg-red-900/50 hover:bg-red-600 text-red-400 hover:text-white border border-red-900 text-xs font-bold px-4 py-2 rounded-xl transition text-center">
                                         Elimina
