@@ -33,4 +33,4 @@ Thumbs.db
 /storage/app/public/exams/*
 !/storage/app/public/exams/.gitignore
 /storage/app/public/archives/*
-!/storage/app/public/archives/.gitignore
+!/storage/app/public/archives/.gitignore*.zip
